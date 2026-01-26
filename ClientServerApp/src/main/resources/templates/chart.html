@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crypto Price Chart</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.2/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+
+</head>
+
+<body>
+
+    <div>
+        <h2>Crypto Price Chart</h2>
+        <canvas id="cryptoChart" width="400" height="200"></canvas>
+    </div>
+
+    <script>
+        // Настройка WebSocket
+        // registerStompEndpoints.addEndpoint("/crypto")
+        const socket = new SockJS('http://localhost:8084/crypto');
+        const stompClient = Stomp.over(socket);
+
+        // Настройка получения данных через WebSocket
+        stompClient.connect({}, () => {
+            console.log("Connected to WebSocket");
+
+            stompClient.subscribe('/topic/updates', (message) => {
+                console.log("Received message: " + message.body);
+                var data = JSON.parse(message.body);
+                console.log("Parsed data:", data);
+
+                // Обновление графика
+                updateChart(data.event_time, data.average_price);
+            });
+        });
+
+        // Инициализация Chart.js
+        const ctx = document.getElementById('cryptoChart').getContext('2d');
+
+        const chartData = {
+            labels: [],
+            datasets: [{
+                label: 'Average Price',
+                data: [],
+                borderColor: 'rgba(75, 192, 192, 1)',
+                fill: false,
+            }]
+        };
+
+        const chartOptions = {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'minute',
+                        tooltipFormat: 'HH:mm:ss',
+                        displayFormats: {
+                            minute: 'HH:mm:ss',
+                        },
+                    },
+                    ticks: {
+                        source: 'auto',
+                        maxRotation: 0,
+                        autoSkip: true,
+                    },
+                    title: {
+                        display: true,
+                        text: 'Time'
+                    },
+                },
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: 'Price'
+                    }
+                },
+            },
+        };
+
+        const cryptoChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: chartOptions,
+        });
+
+
+        // Функция для обновления графика
+        function updateChart(eventTime, averagePrice) {
+            const formattedTime = moment.unix(eventTime).toDate();
+            const currentTime = moment().toDate();
+
+            console.log("Event Time:", formattedTime, "Current Time:", currentTime);
+
+            chartData.labels.push(currentTime);
+            chartData.datasets[0].data.push(averagePrice);
+
+            // Удаляем старые данные за пределами последних 10 минут
+            while (
+                chartData.labels.length > 0 &&
+                moment(currentTime).diff(moment(chartData.labels[0]), 'minutes') > 1
+            ) {
+                chartData.labels.shift();
+                chartData.datasets[0].data.shift();
+            }
+
+            cryptoChart.update();
+        }
+
+    </script>
+
+</body>
+
+</html>
