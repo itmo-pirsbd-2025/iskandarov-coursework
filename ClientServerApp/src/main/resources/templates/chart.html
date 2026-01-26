@@ -31,6 +31,20 @@
         stompClient.connect({}, () => {
             console.log("Connected to WebSocket");
 
+            // Подписка на начальные данные (из кэша)
+            stompClient.subscribe('/topic/initial-data', (message) => {
+                const initialData = JSON.parse(message.body);
+                console.log("Initial data received:", initialData);
+                initialData.forEach(data => {
+                    updateChart(data.event_time, data.average_price);
+                });
+
+                // После получения начальных данных отписываемся от подписки
+                const subId = message.headers.subscription; 
+                stompClient.unsubscribe(subId);
+                // stompClient.unsubscribe(initialDataSubscription.id);
+            });
+
             stompClient.subscribe('/topic/updates', (message) => {
                 console.log("Received message: " + message.body);
                 var data = JSON.parse(message.body);

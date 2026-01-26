@@ -27,4 +27,13 @@ public class WebSocketController {
     public String chart(Model model) {
         return "chart";
     }
+
+    // Подписка на получение начальных данных
+    // Когда клиент подключается, он подписывается на /topic/initial-data
+    // Мы отсылаем ему все данные из кэша
+    @SubscribeMapping("/initial-data")
+    public void sendInitialData() {
+        List<CryptoAggregatedData> cachedData = historicalKafkaConsumerService.getDataCache();
+        kafkaConsumerService.getMessagingTemplate().convertAndSend("/topic/initial-data", cachedData);
+    }
 }

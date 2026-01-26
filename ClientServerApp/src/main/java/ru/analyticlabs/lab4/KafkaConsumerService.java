@@ -34,7 +34,12 @@ public class KafkaConsumerService {
 
     @Autowired
     private ConsumerFactory<String, CryptoAggregatedData> kafkaConsumerFactory;
+    private final int CACHE_SIZE = 1000; // Максимальный размер кэша
     
+    // Получение всех накопленных сообщений из кэша
+    @Getter
+    private final List<CryptoAggregatedData> dataCache = new ArrayList<>();
+
     public KafkaConsumerService(SimpMessagingTemplate messagingTemplate, ObjectMapper objectMapper) {
         this.messagingTemplate = messagingTemplate;
     }
@@ -44,6 +49,14 @@ public class KafkaConsumerService {
     public void handleKafkaMessage(@Payload CryptoAggregatedData message) {
         log.info("Получено сообщение из Kafka: {}", message);
         System.out.println("Consumed data: {" + message + "}");
+
+        if (dataCache.size() >= CACHE_SIZE) {
+            dataCache.remove(0); // Удаляем самое старое сообщение
+        }
+        dataCache.add(message);
+
+        // Сортируем кэш по event_time
+        dataCache.sort(Comparator.comparing(CryptoAggregatedData::getEvent_time));
 
         // Отправляем сообщение всем подписанным WebSocket клиентам
         this.messagingTemplate.convertAndSend("/topic/updates", message);
